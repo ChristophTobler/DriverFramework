@@ -6,11 +6,11 @@
 using namespace DriverFramework;
 
 // Threshold for the derivative to detect rising, falling edges
-#define DT_THRESH 100
+#define DT_THRESH 25
 
 // Add a small margin after the detected end of send and start searching
 // for the echo pulse afterwards
-#define EOS_MARGIN 50
+#define EOS_MARGIN 400
 
 EchoExtractor::EchoExtractor(uint16_t signal_length)
 	: m_signal_length(signal_length)
@@ -66,23 +66,51 @@ int16_t EchoExtractor::_differentiate(const uint16_t *signal)
 
 	for (size_t i = 3; i < m_signal_length - 3; ++i) {
 		m_derivative[i] = - static_cast<int16_t>(signal[i - 3])
-				  - static_cast<int16_t>(signal[i - 2])
-				  - static_cast<int16_t>(signal[i - 1])
-				  + static_cast<int16_t>(signal[i + 1])
-				  + static_cast<int16_t>(signal[i + 2])
-				  + static_cast<int16_t>(signal[i + 3]);
+		                  - static_cast<int16_t>(signal[i - 2])
+		                  - static_cast<int16_t>(signal[i - 1])
+		                  + static_cast<int16_t>(signal[i + 1])
+		                  + static_cast<int16_t>(signal[i + 2])
+		                  + static_cast<int16_t>(signal[i + 3]);
 	}
 
 	return 0;
 }
 
-int16_t EchoExtractor::get_echo_index(const uint16_t *signal)
+int16_t EchoExtractor::get_threshold(const int16_t index, const float height)
+{
+	//return the threshold value depending on the index and height
+	if (height > 0.7f) {
+
+		if (index < 500) {
+			return 4100;
+		} else {
+			return 500;
+		}
+
+	} else {
+
+		if (index < 500) {
+			return 10000; // unrealistic high value
+		} else if (index < 1000) {
+			return 4020;
+		} else  {
+			return 3900;
+		}
+
+	}
+
+}
+
+int16_t EchoExtractor::get_echo_index(const uint16_t *signal, const float height)
 {
 	// Preprocess the signal
 	_filter_read_buffer(signal);
 	_differentiate(m_filtered_buffer);
 	_find_end_of_send(m_filtered_buffer);
 
+	// m_end_of_send > 500 means that it is very close to ground and signal is very noisy -> don't use
+	if (m_end_of_send > 500)
+		return 0;
 	// start searching for the echo pulse after this index
 	int16_t start_for_signal = m_end_of_send + EOS_MARGIN;
 
@@ -98,12 +126,12 @@ int16_t EchoExtractor::get_echo_index(const uint16_t *signal)
 			// rising edge in the signal
 			rising = true;
 
-		} else if (rising && m_derivative[i] < DT_THRESH) {
+		} else if (rising && m_derivative[i] < DT_THRESH && m_filtered_buffer[i] > get_threshold(i, height)) {
 			// detect peak or plateau
 			peak = true;
 			rising = false;
 			start_current_peak = i;
-			max_current_peak = signal[i];
+			max_current_peak = m_filtered_buffer[i];
 
 		} else if (peak && m_derivative[i] < -DT_THRESH) {
 			// detect falling edge after the peak
@@ -119,8 +147,8 @@ int16_t EchoExtractor::get_echo_index(const uint16_t *signal)
 
 		} else if (peak) {
 			// find the maximum value within this peak
-			if (signal[i] > max_current_peak) {
-				max_current_peak = signal[i];
+			if (m_filtered_buffer[i] > max_current_peak) {
+				max_current_peak = m_filtered_buffer[i];
 			}
 		}
 	}
@@ -138,14 +166,14 @@ int16_t EchoExtractor::_filter_read_buffer(const uint16_t *signal)
 	// Set the values at the left edge
 	m_filtered_buffer[0] = signal[0];
 
-	uint16_t running_sum = m_filtered_buffer[0] + m_filtered_buffer[1]
-			       + (signal[2]);
+	uint16_t running_sum = m_filtered_buffer[0] + signal[1]
+	                       + (signal[2]);
 
 	// Mean filter the read signal
-	for (unsigned int i = 2; i < m_signal_length - 1; ++i) {
+	for (unsigned int i = 2; i < m_signal_length - 2; ++i) {
 		m_filtered_buffer[i - 1] = running_sum / 3;
 		running_sum = (running_sum + (signal[i + 1])
-			       - (signal[i - 2]));
+		               - (signal[i - 2]));
 
 	}
 

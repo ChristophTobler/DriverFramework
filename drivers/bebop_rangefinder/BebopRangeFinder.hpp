@@ -52,7 +52,7 @@ struct bebop_range {
 #define BEBOP_RANGEFINDER_CLASS_PATH "/dev/ranger"
 #define BEBOP_RANGEFINDER_DEVICE_PATH "/dev/spidev1.0"
 
-#define BEBOP_RANGEFINDER_MIN_DISTANCE_M 0.5
+#define BEBOP_RANGEFINDER_MIN_DISTANCE_M 0.0
 #define BEBOP_RANGEFINDER_MAX_DISTANCE_M 8.5
 
 #define BEBOP_RANGEFINDER_BUFFER_LEN 8192
@@ -100,6 +100,7 @@ private:
 	EchoExtractor m_extractor;
 	bool m_capture_signal;
 	uint16_t m_capture_count;
+	float m_previous_height;
 
 };
 } // namespace DriverFramework

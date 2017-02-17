@@ -47,9 +47,11 @@ public:
 	// Returns the index where the echo pulse was detected in the signal
 	// This is the differnce between the beginning of send and the beginning
 	// of the reflected echo
-	int16_t get_echo_index(const uint16_t *signal);
+	int16_t get_echo_index(const uint16_t *signal, const float height);
 
 private:
+	// Returns the threshold value depending on the current index and height
+	int16_t get_threshold(const int16_t index, const float height);
 	// Returns the index where the send pulse ends
 	int16_t _find_end_of_send(const uint16_t *signal);
 	// Comoute the derivative of the signal

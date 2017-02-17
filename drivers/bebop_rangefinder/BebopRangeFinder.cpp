@@ -46,7 +46,7 @@ using namespace DriverFramework;
 BebopRangeFinder::BebopRangeFinder(const char *device_path) :
 	SPIDevObj("BebopRangeFinder", device_path, BEBOP_RANGEFINDER_CLASS_PATH, BEBOP_RANGEFINDER_MEASURE_INTERVAL_US),
 	m_sonar_pin(0, 2, BEBOP_RANGEFINDER_BUFFER_LEN), m_requested_data(false),
-	m_extractor(BEBOP_RANGEFINDER_BUFFER_LEN), m_capture_signal(false)
+	m_extractor(BEBOP_RANGEFINDER_BUFFER_LEN), m_capture_signal(false), m_previous_height(0.0f)
 {
 	m_id.dev_id_s.devtype = DRV_DF_DEVTYPE_BEBOP_RANGEFINDER;
 	m_id.dev_id_s.address = DRV_DF_DEVTYPE_BEBOP_RANGEFINDER;
@@ -148,7 +148,7 @@ void BebopRangeFinder::_measure()
 		if (_collect() >= 0) {
 
 			// Get the index of the reflected pulse and compute the distance
-			int16_t echo = m_extractor.get_echo_index(m_read_buffer);
+			int16_t echo = m_extractor.get_echo_index(m_read_buffer, m_previous_height);
 			float height_m = 0.0f;
 
 			if (echo >= 0) {
@@ -158,7 +158,9 @@ void BebopRangeFinder::_measure()
 			} else {
 				height_m = -1.0f;
 			}
-
+			if (height_m < 0.2f)
+				height_m = 0.1f;
+			m_previous_height = height_m;
 
 			if (m_capture_signal) {
 				_dump_signal(BEBOP_RANGEFINDER_CAPTURE_PATH, echo);
